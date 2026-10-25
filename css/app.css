@@ -231,12 +231,9 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .sugg { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .sugg:empty { display: none; }
 .sugg .chip { min-height: 32px; font-size: 13px; padding: 0 12px; }
-.sticky-actions {
-  position: sticky; bottom: calc(var(--tab-h) + var(--safe-b) + 8px); z-index: 4;
-  display: flex; gap: 10px; padding: 10px; margin: 20px -6px 0;
-  border-radius: 6px; background: color-mix(in srgb, var(--bg) 90%, transparent);
-  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-}
+/* Boutons en fin de formulaire, dans le flux : une barre flottante se décale
+   quand le clavier iOS se ferme et fait rater le toucher. */
+.sticky-actions { display: flex; gap: 10px; margin: 24px 0 0; }
 .sticky-actions .btn { flex: 1; }
 .sticky-actions .btn.primary { flex: 2; }
 

@@ -1,7 +1,7 @@
 // Moteur de suggestions : à partir d'une pièce de départ et d'un contexte,
 // compose des tenues complètes (haut + bas + chaussures, + veste / accessoire si pertinent)
 // et les note selon les couleurs, le contexte, la saison et l'historique.
-import { colorInfo, harmony } from './color.js';
+import { colorInfo, harmony } from './color.js?v=3';
 
 const BASE = ['haut', 'bas', 'chaussures'];
 const ORDER = ['veste', 'haut', 'bas', 'chaussures', 'accessoire'];
@@ -24,7 +24,7 @@ export function currentSeason(date = new Date()) {
 
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-export function suggest({ items, outfits, lastWorn, daysSince, isForgotten, anchorId, context, season, count = 3, rand = Math.random }) {
+export function suggest({ items, outfits, lastWorn, daysSince, idleDays, forgottenDays = 30, anchorId, context, season, count = 3, rand = Math.random }) {
   const anchor = items.find((i) => i.id === anchorId) || null;
   const fits = (it) => it === anchor || !it.contexts?.length || it.contexts.includes(context);
 
@@ -50,7 +50,7 @@ export function suggest({ items, outfits, lastWorn, daysSince, isForgotten, anch
     if (it.category === 'chaussures' && it.subtype) s += SHOE_FIT[context]?.[it.subtype] || 0;
     const last = lastWorn(it.id);
     const age = last ? daysSince(last) : Infinity;
-    const forgotten = isForgotten(it);
+    const forgotten = idleDays(it) > forgottenDays;
     if (forgotten) s += 5;
     else if (age <= 1) s -= 12;
     else if (age <= 3) s -= 5;
@@ -68,7 +68,7 @@ export function suggest({ items, outfits, lastWorn, daysSince, isForgotten, anch
   function evaluate(pieces) {
     const h = harmony(pieces.map((p) => meta.get(p.id).info));
     let score = h.score;
-    const reasons = [...h.reasons];
+    let contrast = false;
     for (const p of pieces) score += meta.get(p.id).s;
 
     const top = pieces.find((p) => p.category === 'haut');
@@ -77,7 +77,7 @@ export function suggest({ items, outfits, lastWorn, daysSince, isForgotten, anch
       const a = meta.get(top.id).info;
       const b = meta.get(bottom.id).info;
       const dL = Math.abs(a.L - b.L);
-      if (dL >= 25) { score += 6; reasons.push('un bon contraste entre le haut et le bas'); }
+      if (dL >= 25) { score += 6; contrast = true; }
       else if (dL < 8 && a.name !== b.name && a.neutral && b.neutral) score -= 4;
     }
 
@@ -85,9 +85,9 @@ export function suggest({ items, outfits, lastWorn, daysSince, isForgotten, anch
     for (let i = 0; i < pieces.length; i++) {
       for (let j = i + 1; j < pieces.length; j++) liked += likedPairs.get(pairKey(pieces[i].id, pieces[j].id)) || 0;
     }
-    if (liked) { score += Math.min(18, liked * 6); reasons.push('une association que tu as déjà aimée'); }
+    if (liked) score += Math.min(18, liked * 6);
 
-    return { score, reasons, warnings: h.warnings };
+    return { score, kind: h.kind, contrast, liked: liked > 0, warnings: h.warnings };
   }
 
   const combos = [];
@@ -111,31 +111,30 @@ export function suggest({ items, outfits, lastWorn, daysSince, isForgotten, anch
   const wantJacket = anchor?.category === 'veste'
     || (context !== 'Sport' && (season !== 'été' || context === 'Work' || context === 'Soirée'));
 
-  function bestWith(c, candidates) {
-    let best = null;
-    for (const x of candidates) {
+  // Variantes de la tenue avec chaque pièce candidate, meilleures d'abord.
+  function withEach(c, candidates) {
+    return candidates.map((x) => {
       const pieces = [...c.pieces, x];
       const e = evaluate(pieces);
-      const score = e.score + c.jitter + rand() * 4;
-      if (!best || score > best.score) best = { pieces, ...e, jitter: c.jitter, score };
-    }
-    return best;
+      return { pieces, ...e, jitter: c.jitter, score: e.score + c.jitter + rand() * 4 };
+    }).sort((a, b) => b.score - a.score);
   }
 
+  // Jusqu'à 2 variantes par tenue (2 vestes différentes) pour que la sélection reste variée.
   function addLayers(c) {
-    let out = c;
+    let outs = [c];
     if (wantJacket && jackets.length) {
-      const j = bestWith(out, jackets);
-      if (anchor?.category === 'veste' || j.score > out.score - 12) out = j;
+      const js = withEach(c, jackets).filter((j) => anchor?.category === 'veste' || j.score > c.score - 12).slice(0, 2);
+      if (js.length) outs = js;
     }
-    if (accessories.length) {
-      const a = bestWith(out, accessories);
-      if (anchor?.category === 'accessoire' || a.score >= out.score - 2) out = a;
-    }
-    return out;
+    if (!accessories.length) return outs;
+    return outs.map((o) => {
+      const a = withEach(o, accessories)[0];
+      return anchor?.category === 'accessoire' || a.score >= o.score - 2 ? a : o;
+    });
   }
 
-  const candidates = combos.slice(0, 40).map(addLayers);
+  const candidates = combos.slice(0, 40).flatMap(addLayers);
 
   // Sélection variée : on pénalise les pièces déjà proposées (hors pièce de départ).
   const chosen = [];
@@ -151,10 +150,48 @@ export function suggest({ items, outfits, lastWorn, daysSince, isForgotten, anch
   }
 
   for (const c of chosen) {
-    const forgotten = c.pieces.filter((p) => p !== anchor && meta.get(p.id).forgotten);
-    c.bonus = forgotten.length ? [forgotten.length > 1 ? 'remet en jeu des pièces oubliées' : 'remet en jeu une pièce oubliée'] : [];
     c.pieces.sort((a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category));
+    c.explanation = explain(c);
+  }
+
+  // Une phrase qui cite les vraies couleurs et pièces de la tenue.
+  function explain(c) {
+    const info = (p) => meta.get(p.id).info;
+    const color = (p) => info(p).name.toLowerCase();
+    const shoes = (p) => SHOE_WORD[p.subtype] || 'chaussures';
+    const ofPiece = (p) => (p.category === 'chaussures' ? `des ${shoes(p)}` : OF[p.category]);
+    const colorOf = (p) => `${/^[aeiouyéè]/i.test(color(p)) ? "l'" : 'le '}${color(p)} ${ofPiece(p)}`;
+    const yourPiece = (p) => (p.name ? `« ${p.name} »` : `${p.category === 'chaussures' ? `tes ${shoes(p)}` : YOUR[p.category]} ${color(p)}`);
+
+    const neutrals = [...new Set(c.pieces.filter((p) => info(p).neutral).map(color))].slice(0, 3).join(', ');
+    const accents = c.pieces.filter((p) => !info(p).neutral);
+    const base = {
+      neutral: `Base 100 % neutre (${neutrals}) : sobre et facile à porter`,
+      single: `Neutres (${neutrals}) relevés par une seule couleur : ${accents[0] && colorOf(accents[0])}`,
+      tonal: `Ton sur ton : ${list(accents.map(colorOf))}${neutrals ? `, sur une base ${neutrals}` : ''}`,
+      complementary: `Contraste de couleurs maîtrisé entre ${list(accents.map(colorOf))}`,
+      analogous: `Couleurs voisines qui s'accordent : ${list(accents.map(colorOf))}`,
+    }[c.kind] || `Association audacieuse : ${list(accents.map(colorOf))}`;
+
+    const extras = [];
+    if (c.contrast) extras.push('un bon contraste clair / foncé entre le haut et le bas');
+    if (c.liked) extras.push('une association que tu as déjà aimée');
+    let s = base + (extras.length ? `, avec ${list(extras)}` : '');
+    const forgotten = c.pieces.filter((p) => p !== anchor && meta.get(p.id).forgotten);
+    if (forgotten.length) {
+      const days = [...new Set(forgotten.map(idleDays))];
+      s += days.length === 1
+        ? `, et remet en jeu ${list(forgotten.map(yourPiece))} (au placard depuis ${days[0]} jours)`
+        : `, et remet en jeu ${list(forgotten.map((p) => `${yourPiece(p)} (au placard depuis ${idleDays(p)} jours)`))}`;
+    }
+    if (c.warnings.length) s += ` (attention : ${list(c.warnings)})`;
+    return `${s}.`;
   }
 
   return { results: chosen, missing: [] };
 }
+
+const SHOE_WORD = { Sneakers: 'sneakers', 'Boots / bottines': 'boots', 'Chaussures de ville': 'chaussures de ville' };
+const OF = { haut: 'du haut', bas: 'du bas', veste: 'de la veste', accessoire: "de l'accessoire" };
+const YOUR = { haut: 'ton haut', bas: 'ton bas', veste: 'ta veste', accessoire: 'ton accessoire' };
+const list = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} et ${xs[xs.length - 1]}` : xs[0] || '');

@@ -1,6 +1,6 @@
-import * as db from './db.js';
-import { PALETTE, nearestColor, dominantColors } from './color.js';
-import { suggest, currentSeason } from './suggest.js';
+import * as db from './db.js?v=3';
+import { PALETTE, nearestColor, dominantColors } from './color.js?v=3';
+import { suggest, currentSeason } from './suggest.js?v=3';
 
 // ---------- Référentiels
 
@@ -547,21 +547,12 @@ function suggestResults() {
       ${collage(r.pieces)}
       <div class="card-body">
         <div class="card-meta"><strong>Tenue ${i + 1}</strong><span class="muted">${r.pieces.map((p) => esc(titleOf(p))).join(' · ')}</span></div>
-        <p class="card-note">${esc(explain(r))}</p>
+        <p class="card-note">${esc(r.explanation)}</p>
         <div class="actions" style="margin:4px 0 0">
           <button class="btn small ${r.saved ? 'done' : 'primary'}" data-action="sugg-wear" data-index="${i}"${r.saved ? ' disabled' : ''}>${r.saved ? `${icon('check')} Enregistrée` : 'Je la porte aujourd’hui'}</button>
           <button class="btn small" data-action="sugg-adjust" data-index="${i}">Ajuster</button>
         </div>
       </div></div>`).join('');
-}
-
-// Une phrase : « Fonctionne grâce à A, B et C, et remet en jeu une pièce oubliée. »
-function explain(r) {
-  const list = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} et ${xs[xs.length - 1]}` : xs[0]);
-  let s = r.reasons.length ? `Fonctionne grâce à ${list(r.reasons)}` : 'Association correcte, sans règle particulière';
-  if (r.bonus.length) s += `, et ${list(r.bonus)}`;
-  if (r.warnings.length) s += ` (attention : ${list(r.warnings)})`;
-  return `${s}.`;
 }
 
 // ---------- Écran : pièces oubliées
@@ -730,12 +721,12 @@ function refresh() {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, duration = 2600) {
   const t = $('#toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => t.classList.remove('show'), duration);
 }
 
 // ---------- Actions
@@ -843,7 +834,7 @@ async function saveOutfit() {
 function runSuggest() {
   const s = state.sugg;
   const { results, missing } = suggest({
-    items: state.items, outfits: state.outfits, lastWorn, daysSince, isForgotten: (it) => idleDays(it) > FORGOTTEN_DAYS,
+    items: state.items, outfits: state.outfits, lastWorn, daysSince, idleDays, forgottenDays: FORGOTTEN_DAYS,
     anchorId: s.anchor, context: s.context, season: currentSeason(),
   });
   s.results = results;
@@ -1034,18 +1025,25 @@ const changeHandlers = {
   'import-file': (el) => el.files[0] && importFile(el.files[0]),
 };
 
+const showError = (err) => { console.error(err); toast(`Erreur : ${err?.message || err}`, 8000); };
+
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el || !actions[el.dataset.action]) return;
   e.preventDefault();
-  Promise.resolve(actions[el.dataset.action](el, e)).catch((err) => { console.error(err); toast('Erreur : ' + err.message); });
+  // Retour visuel immédiat sur les boutons d'enregistrement.
+  if (el.tagName === 'BUTTON' && el.dataset.action.endsWith('save')) el.textContent = 'Enregistrement…';
+  Promise.resolve(actions[el.dataset.action](el, e)).catch(showError);
 });
+
+window.addEventListener('error', (e) => showError(e.error || e.message));
+window.addEventListener('unhandledrejection', (e) => showError(e.reason));
 
 document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-change]');
   if (!el || !changeHandlers[el.dataset.change]) return;
   Promise.resolve(changeHandlers[el.dataset.change](el, e))
-    .catch((err) => { console.error(err); toast('Erreur : ' + err.message); })
+    .catch(showError)
     .finally(() => { if (el.type === 'file') el.value = ''; });
 });
 

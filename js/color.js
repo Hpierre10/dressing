@@ -150,11 +150,12 @@ export function colorInfo(color) {
   };
 }
 
-// Note d'harmonie d'un ensemble de couleurs (sortie de colorInfo), avec explications.
+// Note d'harmonie d'un ensemble de couleurs (sortie de colorInfo).
+// kind : neutral | single | tonal | complementary | analogous | clash | many
 export function harmony(infos) {
-  const reasons = [];
   const warnings = [];
   let score = 0;
+  let kind;
 
   const accents = infos.filter((i) => !i.neutral);
   const clusters = [];
@@ -166,17 +167,18 @@ export function harmony(infos) {
 
   if (!clusters.length) {
     score += 14;
-    reasons.push('une base 100 % neutre');
+    kind = 'neutral';
   } else if (clusters.length === 1) {
     score += 20;
-    reasons.push(accents.length > 1 ? 'un ton sur ton maîtrisé' : 'des neutres relevés par une seule couleur');
+    kind = accents.length > 1 ? 'tonal' : 'single';
   } else if (clusters.length === 2) {
     const d = hueDist(clusters[0].h, clusters[1].h);
-    if (d >= 150) { score += 8; reasons.push('un contraste de couleurs complémentaires'); }
-    else if (d <= 60) { score += 10; reasons.push('deux couleurs voisines qui s’accordent'); }
-    else { score -= 25; warnings.push('deux couleurs qui se heurtent'); }
+    if (d >= 150) { score += 8; kind = 'complementary'; }
+    else if (d <= 60) { score += 10; kind = 'analogous'; }
+    else { score -= 25; kind = 'clash'; warnings.push('deux couleurs qui se heurtent'); }
   } else {
     score -= 30 + 10 * (clusters.length - 3);
+    kind = 'many';
     warnings.push('beaucoup de couleurs');
   }
 
@@ -187,5 +189,5 @@ export function harmony(infos) {
   if (names.has('Noir') && names.has('Marron')) { score -= 6; warnings.push('noir et marron ensemble'); }
   if (names.has('Noir') && names.has('Marine')) score -= 3;
 
-  return { score, reasons, warnings };
+  return { score, kind, warnings };
 }
