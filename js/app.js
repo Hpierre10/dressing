@@ -1,6 +1,6 @@
-import * as db from './db.js?v=3';
-import { PALETTE, nearestColor, dominantColors } from './color.js?v=3';
-import { suggest, currentSeason } from './suggest.js?v=3';
+import * as db from './db.js?v=4';
+import { PALETTE, nearestColor, dominantColors } from './color.js?v=4';
+import { suggest, currentSeason } from './suggest.js?v=4';
 
 // ---------- Référentiels
 
@@ -561,7 +561,7 @@ function forgottenRow({ it, n, last }) {
   return `<div class="row">
     ${tile(it)}
     <div class="row-body"><strong>${esc(titleOf(it))}</strong>
-      <span>${esc(it.brand ? `${it.brand} · ` : '')}${last ? `Portée ${ago(last)}` : `Jamais portée · ajoutée il y a ${n} j`}</span></div>
+      <span>${esc(it.brand ? `${it.brand} · ` : '')}${last ? `Portée ${ago(last)}` : `Jamais portée · ajoutée il y a ${n} jours`}</span></div>
     <div class="row-actions">
       <button class="btn small primary" data-action="wear-today" data-id="${it.id}">Portée</button>
       <a class="btn small" href="#/suggest?item=${it.id}">Idées</a>
@@ -591,7 +591,7 @@ function viewSettings() {
     <div class="section">
       <h2>Sauvegarde</h2>
       <p>Tes données restent uniquement sur ce téléphone. Exporte régulièrement un fichier JSON (photos comprises) dans Fichiers ou iCloud Drive.
-      ${last ? `Dernière sauvegarde : ${fmtDate(last)}.` : 'Aucune sauvegarde pour l’instant.'}</p>
+      <br>${last ? `<strong>Dernière sauvegarde : ${fmtDate(last)}</strong>` : '<strong>Aucune sauvegarde pour l’instant.</strong>'}</p>
       <div class="stack">
         ${state.exportFile ? `<button class="btn primary" data-action="export-save">Enregistrer ${esc(state.exportFile.name)} (${(state.exportFile.size / 1048576).toFixed(1)} Mo)</button>`
           : `<button class="btn primary" data-action="export-prepare">Exporter la sauvegarde</button>`}
@@ -649,7 +649,7 @@ function claudeText() {
   const lines = [
     `# Mon dressing — export du ${fmtDate(today())}`,
     '',
-    `Voici l'inventaire complet de ma garde-robe (${plural(state.items.length, 'pièce')}, ${plural(state.outfits.length, 'tenue')} enregistrées). Saison actuelle : ${currentSeason()}.`,
+    `Voici l'inventaire complet de ma garde-robe (${plural(state.items.length, 'pièce')}, ${plural(state.outfits.length, 'tenue')} enregistrée${state.outfits.length > 1 ? 's' : ''}). Saison actuelle : ${currentSeason()}.`,
     'Mon style : minimaliste, urbain, scandinave et parisien, avec des basiques de qualité et quelques pièces statement. Je porte beaucoup de sneakers.',
     "Aide-moi à composer des tenues en utilisant uniquement ces pièces et en citant leurs identifiants entre crochets. Veille à la cohérence des couleurs, du style et du contexte (Work, Casual, Sport, Soirée), appuie-toi sur les associations que j'aime et remets en jeu les pièces que je n'ai pas portées depuis longtemps.",
     '',
@@ -844,6 +844,24 @@ function runSuggest() {
   $('.card, .missing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// Presse-papiers : l'API moderne exige https ; sinon (test en http), ancienne méthode par sélection.
+async function copyText(text) {
+  if (window.isSecureContext && navigator.clipboard) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { /* méthode de secours */ }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  ta.remove();
+  return ok;
+}
+
 async function prepareExport() {
   toast('Préparation de la sauvegarde…');
   const conv = (list) => Promise.all(list.map(async (x) => ({ ...x, photo: await blobToDataURL(x.photo), thumb: await blobToDataURL(x.thumb) })));
@@ -968,12 +986,8 @@ const actions = {
 
   async 'copy-claude'() {
     state.claudeText = claudeText();
-    try {
-      await navigator.clipboard.writeText(state.claudeText);
-      toast('Copié ! Colle-le dans Claude');
-    } catch {
-      toast('Copie automatique impossible : sélectionne le texte ci-dessous');
-    }
+    const ok = await copyText(state.claudeText);
+    toast(ok ? 'Copié ! Colle-le dans Claude' : 'Copie automatique impossible : sélectionne le texte ci-dessous');
     render();
   },
   'export-prepare': () => prepareExport(),
