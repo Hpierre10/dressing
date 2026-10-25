@@ -1,6 +1,6 @@
-import * as db from './db.js?v=4';
-import { PALETTE, nearestColor, dominantColors } from './color.js?v=4';
-import { suggest, currentSeason } from './suggest.js?v=4';
+import * as db from './db.js?v=5';
+import { PALETTE, nearestColor, dominantColors } from './color.js?v=5';
+import { suggest, currentSeason } from './suggest.js?v=5';
 
 // ---------- Référentiels
 
@@ -561,7 +561,7 @@ function forgottenRow({ it, n, last }) {
   return `<div class="row">
     ${tile(it)}
     <div class="row-body"><strong>${esc(titleOf(it))}</strong>
-      <span>${esc(it.brand ? `${it.brand} · ` : '')}${last ? `Portée ${ago(last)}` : `Jamais portée · ajoutée il y a ${n} jours`}</span></div>
+      <span>${esc(it.brand ? `${it.brand} · ` : '')}${last ? `Portée ${ago(last)}` : `Jamais portée · ajoutée ${ago(toISO(new Date(it.createdAt)))}`}</span></div>
     <div class="row-actions">
       <button class="btn small primary" data-action="wear-today" data-id="${it.id}">Portée</button>
       <a class="btn small" href="#/suggest?item=${it.id}">Idées</a>
@@ -571,7 +571,7 @@ function forgottenRow({ it, n, last }) {
 function viewForgotten() {
   const { old, fresh } = forgottenLists();
   return header('Pièces oubliées', { sub: `Pas portées depuis plus de ${FORGOTTEN_DAYS} jours` }) + `
-    ${old.length ? old.map(forgottenRow).join('') : `<div class="empty"><p><strong>Rien d'oublié</strong></p><p class="muted">Toutes tes pièces ont été portées ces ${FORGOTTEN_DAYS} derniers jours.</p></div>`}
+    ${old.length ? old.map(forgottenRow).join('') : `<div class="empty"><p><strong>Aucune pièce oubliée pour l'instant</strong></p><p class="muted">Une pièce apparaît ici quand elle n'a pas été portée depuis plus de ${FORGOTTEN_DAYS} jours.</p></div>`}
     ${fresh.length ? `<details><summary>Ajoutées récemment, jamais portées (${fresh.length})</summary>${fresh.map(forgottenRow).join('')}</details>` : ''}
     <p class="hint" style="margin-top:16px">Une pièce compte comme portée quand elle figure dans une tenue enregistrée ou que tu touches « Porté aujourd'hui ».</p>`;
 }

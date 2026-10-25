@@ -1,7 +1,7 @@
 // Moteur de suggestions : à partir d'une pièce de départ et d'un contexte,
 // compose des tenues complètes (haut + bas + chaussures, + veste / accessoire si pertinent)
 // et les note selon les couleurs, le contexte, la saison et l'historique.
-import { colorInfo, harmony } from './color.js?v=4';
+import { colorInfo, harmony } from './color.js?v=5';
 
 const BASE = ['haut', 'bas', 'chaussures'];
 const ORDER = ['veste', 'haut', 'bas', 'chaussures', 'accessoire'];
