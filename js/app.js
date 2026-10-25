@@ -74,13 +74,15 @@ function computeWears() {
 const wearsOf = (id) => state.wears.get(id) || [];
 const lastWorn = (id) => { const w = wearsOf(id); return w[w.length - 1] || null; };
 
+// Jours depuis la dernière fois portée, ou depuis l'ajout si jamais portée.
+const idleDays = (it) => daysSince(lastWorn(it.id) || toISO(new Date(it.createdAt)));
+
 function forgottenLists() {
   const old = [];
   const fresh = [];
   for (const it of state.items) {
     const last = lastWorn(it.id);
-    const ref = last || toISO(new Date(it.createdAt));
-    const n = daysSince(ref);
+    const n = idleDays(it);
     if (n > FORGOTTEN_DAYS) old.push({ it, n, last });
     else if (!last) fresh.push({ it, n, last });
   }
@@ -841,8 +843,8 @@ async function saveOutfit() {
 function runSuggest() {
   const s = state.sugg;
   const { results, missing } = suggest({
-    items: state.items, outfits: state.outfits, lastWorn, daysSince,
-    anchorId: s.anchor, context: s.context, season: currentSeason(), forgottenDays: FORGOTTEN_DAYS,
+    items: state.items, outfits: state.outfits, lastWorn, daysSince, isForgotten: (it) => idleDays(it) > FORGOTTEN_DAYS,
+    anchorId: s.anchor, context: s.context, season: currentSeason(),
   });
   s.results = results;
   s.missing = missing;

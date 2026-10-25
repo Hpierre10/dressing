@@ -24,7 +24,7 @@ export function currentSeason(date = new Date()) {
 
 const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-export function suggest({ items, outfits, lastWorn, daysSince, anchorId, context, season, count = 3, forgottenDays = 30, rand = Math.random }) {
+export function suggest({ items, outfits, lastWorn, daysSince, isForgotten, anchorId, context, season, count = 3, rand = Math.random }) {
   const anchor = items.find((i) => i.id === anchorId) || null;
   const fits = (it) => it === anchor || !it.contexts?.length || it.contexts.includes(context);
 
@@ -50,14 +50,17 @@ export function suggest({ items, outfits, lastWorn, daysSince, anchorId, context
     if (it.category === 'chaussures' && it.subtype) s += SHOE_FIT[context]?.[it.subtype] || 0;
     const last = lastWorn(it.id);
     const age = last ? daysSince(last) : Infinity;
-    const forgotten = age > forgottenDays;
+    const forgotten = isForgotten(it);
     if (forgotten) s += 5;
     else if (age <= 1) s -= 12;
     else if (age <= 3) s -= 5;
     meta.set(it.id, { s, forgotten, info: colorInfo(it.color) });
   }
 
-  const pool = (cat) => (anchor?.category === cat ? [anchor] : items.filter((i) => i.category === cat && fits(i)));
+  // En Sport : sneakers (ou chaussures sans sous-type) uniquement.
+  const sporty = (i) => i.category !== 'chaussures' || !i.subtype || i.subtype === 'Sneakers';
+  const pool = (cat) => (anchor?.category === cat ? [anchor]
+    : items.filter((i) => i.category === cat && fits(i) && (context !== 'Sport' || sporty(i))));
   const [tops, bottoms, shoes] = BASE.map(pool);
   const missing = BASE.filter((_, i) => ![tops, bottoms, shoes][i].length);
   if (missing.length) return { results: [], missing };
