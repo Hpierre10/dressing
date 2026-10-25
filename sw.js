@@ -1,7 +1,7 @@
 // Service worker : l'app fonctionne hors ligne.
 // Stratégie « stale-while-revalidate » : réponse immédiate depuis le cache,
 // mise à jour en arrière-plan (la nouvelle version s'affiche au lancement suivant).
-const CACHE = 'dressing-v1';
+const CACHE = 'dressing-v2';
 const ASSETS = [
   './',
   './index.html',

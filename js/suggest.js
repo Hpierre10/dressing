@@ -1,7 +1,7 @@
 // Moteur de suggestions : à partir d'une pièce de départ et d'un contexte,
 // compose des tenues complètes (haut + bas + chaussures, + veste / accessoire si pertinent)
 // et les note selon les couleurs, le contexte, la saison et l'historique.
-import { colorInfo, harmony } from './color.js?v=5';
+import { colorInfo, harmony } from './color.js?v=6';
 
 const BASE = ['haut', 'bas', 'chaussures'];
 const ORDER = ['veste', 'haut', 'bas', 'chaussures', 'accessoire'];
@@ -149,13 +149,15 @@ export function suggest({ items, outfits, lastWorn, daysSince, idleDays, forgott
     chosen.push(candidates.splice(bi, 1)[0]);
   }
 
-  for (const c of chosen) {
+  // Décalage aléatoire : les 3 tenues n'utilisent pas la même tournure de phrase.
+  const offset = Math.floor(rand() * 6);
+  chosen.forEach((c, i) => {
     c.pieces.sort((a, b) => ORDER.indexOf(a.category) - ORDER.indexOf(b.category));
-    c.explanation = explain(c);
-  }
+    c.explanation = explain(c, i + offset);
+  });
 
-  // Une phrase qui cite les vraies couleurs et pièces de la tenue.
-  function explain(c) {
+  // Une phrase qui cite les vraies couleurs et pièces de la tenue ; `variant` choisit la tournure.
+  function explain(c, variant) {
     const info = (p) => meta.get(p.id).info;
     const color = (p) => info(p).name.toLowerCase();
     const shoes = (p) => SHOE_WORD[p.subtype] || 'chaussures';
@@ -163,18 +165,38 @@ export function suggest({ items, outfits, lastWorn, daysSince, idleDays, forgott
     const colorOf = (p) => `${/^[aeiouyéè]/i.test(color(p)) ? "l'" : 'le '}${color(p)} ${ofPiece(p)}`;
     const yourPiece = (p) => (p.name ? `« ${p.name} »` : `${p.category === 'chaussures' ? `tes ${shoes(p)}` : YOUR[p.category]} ${color(p)}`);
 
-    const neutrals = [...new Set(c.pieces.filter((p) => info(p).neutral).map(color))].slice(0, 3).join(', ');
+    const n = list([...new Set(c.pieces.filter((p) => info(p).neutral).map(color))].slice(0, 3));
     const accents = c.pieces.filter((p) => !info(p).neutral);
-    const base = {
-      neutral: `Base 100 % neutre (${neutrals}) : sobre et facile à porter`,
-      single: `Neutres (${neutrals}) relevés par une seule couleur : ${accents[0] && colorOf(accents[0])}`,
-      tonal: `Ton sur ton : ${list(accents.map(colorOf))}${neutrals ? `, sur une base ${neutrals}` : ''}`,
-      complementary: `Contraste de couleurs maîtrisé entre ${list(accents.map(colorOf))}`,
-      analogous: `Couleurs voisines qui s'accordent : ${list(accents.map(colorOf))}`,
-    }[c.kind] || `Association audacieuse : ${list(accents.map(colorOf))}`;
+    const a = list(accents.map(colorOf));
+    const pick = (options) => options[variant % options.length];
+    const base = pick({
+      neutral: [
+        `Base 100 % neutre (${n}) : sobre et facile à porter`,
+        `Tout en neutres (${n}) : une valeur sûre, intemporelle`,
+        `Palette neutre (${n}), le minimalisme qui ne se trompe pas`,
+      ],
+      single: [
+        `Neutres (${n}) relevés par une seule couleur : ${a}`,
+        `${cap(a)} apporte la touche de couleur, le reste (${n}) reste sobre`,
+        `Une base ${n} qui laisse ressortir ${a}`,
+      ],
+      tonal: [
+        `Ton sur ton : ${a}${n ? `, sur une base ${n}` : ''}`,
+        `Camaïeu harmonieux entre ${a}`,
+        `${cap(a)} se répondent en douceur${n ? `, posés sur du ${n}` : ''}`,
+      ],
+      complementary: [
+        `Contraste de couleurs maîtrisé entre ${a}`,
+        `${cap(a)} s'opposent juste ce qu'il faut`,
+      ],
+      analogous: [
+        `Couleurs voisines qui s'accordent : ${a}`,
+        `${cap(a)} sont de la même famille et se marient naturellement`,
+      ],
+    }[c.kind] || [`Association audacieuse : ${a}`]);
 
     const extras = [];
-    if (c.contrast) extras.push('un bon contraste clair / foncé entre le haut et le bas');
+    if (c.contrast) extras.push(pick(['un bon contraste clair / foncé entre le haut et le bas', 'un haut et un bas bien contrastés', 'un jeu clair / foncé entre le haut et le bas']));
     if (c.liked) extras.push('une association que tu as déjà aimée');
     let s = base + (extras.length ? `, avec ${list(extras)}` : '');
     const forgotten = c.pieces.filter((p) => p !== anchor && meta.get(p.id).forgotten);
@@ -194,4 +216,5 @@ export function suggest({ items, outfits, lastWorn, daysSince, idleDays, forgott
 const SHOE_WORD = { Sneakers: 'sneakers', 'Boots / bottines': 'boots', 'Chaussures de ville': 'chaussures de ville' };
 const OF = { haut: 'du haut', bas: 'du bas', veste: 'de la veste', accessoire: "de l'accessoire" };
 const YOUR = { haut: 'ton haut', bas: 'ton bas', veste: 'ta veste', accessoire: 'ton accessoire' };
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const list = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} et ${xs[xs.length - 1]}` : xs[0] || '');

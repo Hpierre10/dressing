@@ -1,6 +1,6 @@
-import * as db from './db.js?v=5';
-import { PALETTE, nearestColor, dominantColors } from './color.js?v=5';
-import { suggest, currentSeason } from './suggest.js?v=5';
+import * as db from './db.js?v=6';
+import { PALETTE, nearestColor, dominantColors } from './color.js?v=6';
+import { suggest, currentSeason } from './suggest.js?v=6';
 
 // ---------- Référentiels
 

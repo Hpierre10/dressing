@@ -15,6 +15,7 @@ export const PALETTE = [
   { name: 'Marine', hex: '#1f2b47', neutral: true },
   { name: 'Denim', hex: '#4b6688', neutral: true },
   { name: 'Kaki', hex: '#6b6a40', neutral: true },
+  { name: 'Bleu roi', hex: '#2c48a6' },
   { name: 'Bleu', hex: '#2f6fd6' },
   { name: 'Bleu ciel', hex: '#a2c6e8' },
   { name: 'Turquoise', hex: '#2aa5a0' },
