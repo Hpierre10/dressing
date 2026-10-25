@@ -188,8 +188,8 @@ function header(title, { back = '', right = '', sub = '' } = {}) {
 function collage(pieces, photo) {
   const its = pieces.slice().sort((a, b) => CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category));
   const n = its.length + (photo ? 1 : 0);
-  const cols = photo ? Math.max(2, Math.min(3, Math.ceil(its.length / 2) + 1)) : n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : 3;
-  return `<div class="collage" style="--cols:${cols}">
+  const cols = photo ? 1 + Math.ceil(its.length / 2) : n <= 3 ? Math.max(n, 1) : n === 4 ? 2 : 3;
+  return `<div class="collage${photo ? ' with-me' : ''}" style="--cols:${cols}">
     ${photo ? `<img class="me" src="${blobUrl(photo)}" alt="Photo de la tenue">` : ''}
     ${its.map((it) => pic(it)).join('')}
   </div>`;

@@ -4,7 +4,7 @@
     {
       "name": "dressing",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765"],
+      "runtimeArgs": ["serve.py"],
       "port": 8765
     }
   ]
